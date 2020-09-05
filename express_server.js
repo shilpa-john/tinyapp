@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 app.use(cookieParser());
 app.set("view engine", "ejs");
 const { emailLookUp} = require('./helpers');
+const { urlsForUser } = require('./helpers');
 //const bcrypt = require('bcrypt');
 
 
@@ -46,16 +47,17 @@ app.get("/hello", (req, res) => {
 
 app.get("/urls/new", (req, res) => {
   if (!req.cookies.user_id) {
-  res.render("urls_new");
+   return res.redirect("/login");
 }
 let templateVars = { user: users[req.cookies.user_id] };
   res.render("urls_new", templateVars);
 });
 
-/*app.get("/urls/:shortURL", (req, res) => {
+/*app.get("/u/:shortURL", (req, res) => {
   let templateVars = { shortURL: req.params.shortURL, longURL: "http://www.lighthouselabs.ca"};
   res.render("urls_show", templateVars);
 });*/
+
 
 app.get("/login", (req, res) => {
   var user = {};
@@ -65,21 +67,22 @@ app.get("/login", (req, res) => {
   res.render("login", templateVars);
 });
 
-app.get("/u/:shortURL", (req, res) => {
+/*app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
   const longURL = "http://www.lighthouselabs.ca";
   res.redirect(longURL);
-});
+})*/
 
 app.get("/urls", (req, res) => {
   var user = {};
   const userId = req.cookies.user_id;
+  const urlsOfUserDatabase = urlsForUser(userId, urlDatabase);
   console.log(userId);
   if(userId)
   {
     user =  users[userId];
    }
-  let templateVars = { user: user, urls: urlDatabase };
+  let templateVars = { user: user, urls: urlsOfUserDatabase };
   res.render("urls_index", templateVars);
 });
 
@@ -130,16 +133,23 @@ app.post("/login", (req, res) => {
     res.status(403).send("User Not Found");
   }
   });
-  
 
+
+app.get("/u/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+  const longURL = urlDatabase[shortURL].longURL;
+  console.log(shortURL);
+  if (Object.keys(urlDatabase).includes(shortURL)) {
+    res.redirect(longURL);
+  } else {
+    res.redirect("urls_index", { urls: urlDatabase });
+  }
+});
 
 app.post("/logout", (req, res) => {
   res.cookie('user_id', "");
   res.redirect("/urls");
 });
-
-
-
 
 // GET '/' sends logged in users to the '/urls' page and logged out users to the '/login' page
 /*app.get('/', (req, res) => {
@@ -157,11 +167,34 @@ app.post("/urls", (req, res) => {
   res.send("Ok");         // Respond with 'Ok' (we will replace this)
 });
 
-app.delete('/urls/:shortURL/delete', (req, res) => {
+//Edit URL
+app.post("/urls/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
-  res.redirect('/urls');
+  const newLongURL = req.body.longURL;
+  urlDatabase[shortURL].longURL = newLongURL;
+  res.redirect("/urls");
 });
 
+
+//Delete URL
+app.post("/urls/:shortURL/delete", (req, res) => {
+  const userid =  users[req.cookie.user_id].id;
+  const userID = urlDatabase[req.params.shortURL].userID;
+  if (!userid  || userid !== userID) {
+    return res.redirect("/urls");
+  }
+  delete urlDatabase[req.params.shortURL];
+  console.log(urlDatabase);
+  res.redirect("/urls");
+});
+
+//Edit URL
+app.post("/urls/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+  const newLongURL = req.body.longURL;
+  urlDatabase[shortURL].longURL = newLongURL;
+  res.redirect("/urls");
+});
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
